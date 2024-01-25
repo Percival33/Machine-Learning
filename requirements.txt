@@ -107,3 +107,6 @@ webcolors==1.13
 webencodings==0.5.1
 websocket-client==1.7.0
 widgetsnbextension==4.0.9
+orange3==3.36.2
+
+setuptools~=58.1.0
