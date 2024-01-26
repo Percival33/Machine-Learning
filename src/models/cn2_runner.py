@@ -15,7 +15,14 @@ class CN2_Runner:
 
     def _log_results(self):
         filepath = os.path.abspath(
-            os.path.join(__file__, "..", "..", "..", ".logs", f'{str(datetime.datetime.now()).replace(" ", "_")}.txt')
+            os.path.join(
+                __file__,
+                "..",
+                "..",
+                "..",
+                ".logs",
+                f'{str(datetime.datetime.now()).replace(" ", "_")}.txt',
+            )
         )
         with open(filepath, "w") as f:
             for r in self.results.models[0][0].rule_list:
@@ -32,8 +39,6 @@ class CN2_Runner:
         )
 
         self._log_results()
-
-        return self.results
 
     def get_rules(self):
         return self.results.models[0][0].rule_list
