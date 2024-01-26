@@ -249,7 +249,7 @@ cn2_bank = {
     "no_rules": [42, 42, 22, 36, 59, 63, 73, 64, 47, 71, 51, 41, 36, 79, 58, 55, 60, 38, 70, 54],
 }
 
-df = pd.DataFrame(data)
+df = pd.DataFrame(cn2_bank)
 
 # Function to plot and save each metric
 FIGURES_FOLDER = os.path.abspath(
@@ -259,12 +259,13 @@ FIGURES_FOLDER = os.path.abspath(
 
 def plot_and_save(metric_name):
     plt.figure(figsize=(10, 5))
-    sns.lineplot(data=df, x=df.index, y=metric_name, color="#AEE0D5", linewidth=2.5)
+    # sns.lineplot(data=df, x=df.index, y=metric_name, color="#AEE0D5", linewidth=2.5)
+    sns.barplot(data=df, x=df.index, y=metric_name, color="#AEE0D5")
     plt.title(metric_name.replace("_", " ").title())
     plt.xlabel("")
     plt.grid(True)
     sns.despine()
-    plt.savefig(f"{FIGURES_FOLDER}/adult-{metric_name}.eps", format="eps")
+    plt.savefig(f"{FIGURES_FOLDER}/bank-{metric_name}.eps", format="eps")
     plt.close()
 
 
