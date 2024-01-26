@@ -10,7 +10,6 @@ def create_test_data(name: str):
     for i in df.columns:
         df[i] = lb.fit_transform(df[i])
 
-    # clusters = KMeans(n_clusters=10, random_state=0, n_init="auto").fit_predict(df)
     CLUSTERS = 20
     clusters = KMeans(n_clusters=CLUSTERS, random_state=0, n_init="auto").fit_predict(df.drop('y', axis=1))
 
