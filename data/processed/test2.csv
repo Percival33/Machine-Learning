@@ -1,0 +1,10 @@
+age,workclass,fnlwgt,education,education - num,marital - status,occupation,relationship,race,sex,capital - gain,capital - loss,hours - per - week,native - country,y
+65, Private,184454, HS-grad,9, Married-civ-spouse, Machine-op-inspct, Husband, White, Male,6418,0,40, United-States, >50K.
+36, Federal-gov,212465, Bachelors,13, Married-civ-spouse, Adm-clerical, Husband, White, Male,0,0,40, United-States, <=50K.
+26, Private,82091, HS-grad,9, Never-married, Adm-clerical, Not-in-family, White, Female,0,0,39, United-States, <=50K.
+58, ?,299831, HS-grad,9, Married-civ-spouse, ?, Husband, White, Male,0,0,35, United-States, <=50K.
+48, Private,279724, HS-grad,9, Married-civ-spouse, Machine-op-inspct, Husband, White, Male,3103,0,48, United-States, >50K.
+43, Private,346189, Masters,14, Married-civ-spouse, Exec-managerial, Husband, White, Male,0,0,50, United-States, >50K.
+20, State-gov,444554, Some-college,10, Never-married, Other-service, Own-child, White, Male,0,0,25, United-States, <=50K.
+43, Private,128354, HS-grad,9, Married-civ-spouse, Adm-clerical, Wife, White, Female,0,0,30, United-States, <=50K.
+37, Private,60548, HS-grad,9, Widowed, Machine-op-inspct, Unmarried, White, Female,0,0,20, United-States, <=50K.
