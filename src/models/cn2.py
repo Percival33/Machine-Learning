@@ -1,11 +1,6 @@
 import Orange
 from src.data.create_data import create_data
-
-# train_data, test_data = Orange.evaluation.testing.sample(new_data, n=0.8)
-
-BANK_FULL_DATA = "../../data/raw/bank+marketing/bank/bank-full.csv"
-BANK_SAMPLE_DATA = "../../data/raw/bank+marketing/bank/bank.csv"
-ADULT_DATA = "../../data/raw/adult/adult.data"
+import datetime
 
 
 def analyze_results(results: Orange.evaluation.Results):
@@ -14,12 +9,29 @@ def analyze_results(results: Orange.evaluation.Results):
     )
 
 
-if __name__ == "__main__":
-    data = Orange.data.Table(ADULT_DATA)
+def run(file_path, test_split=0.8):
+    data = Orange.data.Table(file_path)
     new_data = create_data(data)
-    print(new_data.domain.class_var)
-
-    train_data, test_data = Orange.evaluation.testing.sample(new_data, n=0.8)
+    train_data, test_data = Orange.evaluation.testing.sample(new_data, n=test_split)
     learners = [Orange.classification.CN2Learner()]
     results = Orange.evaluation.testing.TestOnTestData(train_data, test_data, learners)
-    analyze_results(results)
+    with open(f'../../.logs/{str(datetime.datetime.now()).replace(" ", "_")}', 'w') as f:
+        for r in learners[0].rule_list:
+            f.write(r, r.curr_class_dist.tolist())
+
+        f.write(analyze_results(results))
+
+    print(analyze_results(results))
+
+
+if __name__ == "__main__":
+    # data = Orange.data.Table("../../data/raw/adult/adult.data")
+    # new_data = create_data(data)
+    # print(new_data.domain.class_var)
+    #
+    # train_data, test_data = Orange.evaluation.testing.sample(new_data, n=0.8)
+    # learners = [Orange.classification.CN2Learner()]
+    # results = Orange.evaluation.testing.TestOnTestData(train_data, test_data, learners)
+    # analyze_results(results)
+
+    run("../../data/processed/test.csv")

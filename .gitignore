@@ -87,3 +87,6 @@ target/
 
 # Virtual env
 venv
+
+# logs
+.logs
