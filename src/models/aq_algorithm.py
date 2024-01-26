@@ -1,7 +1,13 @@
 import heapq
+import pickle
+
 import pandas as pd
 from copy import deepcopy
+
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import concurrent.futures
 
 
 class Rule:
@@ -73,24 +79,37 @@ class Cover:
         self.covered = 0
 
     @staticmethod
-    def _cover_positive(rule: Rule, example):
+    def cover_positive(rule: Rule, example):
         return all(not rule.contains(x, example[x]) for x in example.index)
 
     def covers(self, example):
-        return all(self._cover_positive(rule, example) for rule in self.rules)
+        return all(self.cover_positive(rule, example) for rule in self.rules)
 
     def add(self, rules: set[Rule], positives: pd.DataFrame):
         for rule in rules:
-            covered = positives.apply(lambda x: self._cover_positive(rule, x), axis=1).sum()
+            covered = positives.apply(lambda x: self.cover_positive(rule, x), axis=1).sum()
             if covered > self.covered:
                 self.covered = covered
             rule.covered = covered
+            self.rules.add(rule)
+
+    def add_rules(self, rules: set[Rule]):
+        for rule in rules:
+            if rule.covered > self.covered:
+                self.covered = rule.covered
             self.rules.add(rule)
 
     def prune_worst(self):
         if self.max_rules is None:
             return
         self.rules = set(heapq.nlargest(self.max_rules, self.rules, key=lambda x: x.covered))
+
+
+def seed_star(self, seed):
+    rules = self._generate_stars(seed, self.neg)
+    for rule in rules:
+        rule.covered = self.pos.apply(lambda x: Cover.cover_positive(rule, x), axis=1).sum()
+    return rules
 
 
 class AQClassifier:
@@ -101,20 +120,40 @@ class AQClassifier:
         self.max_rules = kwargs['max_rules']
         self.cover = Cover(self.max_rules)
 
+    def save(self, filename):
+        with open(filename, 'wb') as file:
+            pickle.dump(self.cover.rules, file)
+
+    @staticmethod
+    def load(filename, **kwargs):
+        with open(filename, 'rb') as file:
+            rules = pickle.load(file)
+            clf = AQClassifier(**kwargs)
+            cover = Cover(kwargs['max_rules'])
+            cover.rules = rules
+            clf.cover = cover
+            return clf
+
     def fit(self, x_train, y_train):
         self.cover = Cover(self.max_rules)
         pos = x_train[y_train]
         neg = x_train[~ y_train]
+        self.pos = pos
+        self.neg = neg
         work_df = pos
-        for _ in tqdm(range(self.max_it)):
-            seed = work_df.sample(n=1).iloc[0]
-            rules = self._generate_stars(seed, neg)
-            self.cover.add(rules, pos)
-            self.cover.prune_worst()
-            covered = work_df.apply(lambda x: self.cover.covers(x), axis=1)
-            work_df = work_df[~covered]
-            if len(work_df) == 0:
-                return
+
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            for _ in tqdm(range(self.max_it)):
+                n = 2 if len(work_df) > 2 else len(work_df)
+                jobs = [executor.submit(seed_star, self, seed) for _, seed in work_df.sample(n=n).iterrows()]
+                for job in jobs:
+                    rules = job.result()
+                    self.cover.add_rules(rules)
+                self.cover.prune_worst()
+                covered = work_df.apply(lambda x: self.cover.covers(x), axis=1)
+                work_df = work_df[~covered]
+                if len(work_df) == 0:
+                    return
 
     def predict(self, x_test):
         return x_test.apply(lambda x: self.cover.covers(x), axis=1)
@@ -126,7 +165,6 @@ class AQClassifier:
             if any(rule.cover(neg_ex) for rule in rules):
                 return neg_ex
         return df.loc[df.sample(n=1).index[0]]
-
 
     def _generate_stars(self, seed, negatives) -> set[Rule]:
         partial_stars: set[Rule] = set()
@@ -155,7 +193,7 @@ class AQClassifier:
                         candidates.add(new_ps)
             # Add rules from current difference between seed and negative example
             for ps in generate_partial_stars(diff_columns, neg_ex.index):
-                ps.covered = negatives.apply(lambda x: new_ps.cover(x), axis=1).sum()
+                ps.covered = negatives.apply(lambda x: ps.cover(x), axis=1).sum()
                 candidates.add(ps)
 
             # Add new rules
@@ -167,3 +205,27 @@ class AQClassifier:
             work_df = work_df[~covered]
             i += 1
         return partial_stars
+
+
+if __name__ == '__main__':
+    df = pd.read_csv("../../data/processed/adult.csv").select_dtypes(exclude=["number"]).head(100)
+    df['y'] = df['y'].map(lambda x: x == ' <=50K')
+    X_train, X_test, y_train, y_test = train_test_split(df.drop(columns='y'), df['y'], test_size=0.2)
+    clf = AQClassifier(**{
+        'star_it': 20,
+        'it': 10,
+        'max_cpx': 50,
+        'max_rules': 10,
+    })
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    print(f"Accuracy: {classification_report(y_test, y_pred)}")
+    clf.save("../../models/aq")
+    clf2 = AQClassifier.load("../../models/aq", **{
+        'star_it': 20,
+        'it': 10,
+        'max_cpx': 50,
+        'max_rules': 10,
+    })
+    y_pred2 = clf2.predict(X_test)
+    print(f"Accuracy: {classification_report(y_test, y_pred2)}")
