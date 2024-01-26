@@ -18,5 +18,7 @@ if __name__ == "__main__":
 
     for idx, test_file in enumerate(adult_test):
         test_path = os.path.join(folder_path, test_file)
-        cn2.fit_predict(adult_test[max(idx-1, 0)], test_file, base_rules=previous_rules)
+        prev_path = os.path.join(folder_path, adult_test[max(idx-1, 0)])
+        cn2.fit_predict(prev_path, test_path, base_rules=previous_rules)
+        print(idx, cn2.get_stats())
         previous_rules = cn2.get_rules()

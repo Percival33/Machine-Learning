@@ -1,3 +1,5 @@
+import os.path
+
 import Orange
 from src.data.create_data import create_data
 import datetime
@@ -11,6 +13,16 @@ class CN2_Runner:
     def __init__(self):
         self.results = None
 
+    def _log_results(self):
+        filepath = os.path.abspath(
+            os.path.join(__file__, "..", "..", "..", ".logs", f'{str(datetime.datetime.now()).replace(" ", "_")}.txt')
+        )
+        with open(filepath, "w") as f:
+            for r in self.results.models[0][0].rule_list:
+                print(str(r))
+                f.write(str(r) + "\n")
+            f.write(analyze_results(self.results))
+
     def fit_predict(self, train_path, test_path, base_rules=None):
         train_data = self._preprocess_data(train_path)
         test_data = self._preprocess_data(test_path)
@@ -18,6 +30,9 @@ class CN2_Runner:
         self.results = Orange.evaluation.testing.TestOnTestData(
             data=train_data, test_data=test_data, learners=learners, store_models=True
         )
+
+        self._log_results()
+
         return self.results
 
     def get_rules(self):
