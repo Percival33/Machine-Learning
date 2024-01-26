@@ -13,12 +13,14 @@ import concurrent.futures
 class Rule:
     def __init__(self, col_names: list[str]):
         self._complexes = {name: set() for name in col_names}
+        self.predicate_value = False
         self.covered = 0
 
-    def add(self, col_name: str, value: str):
+    def add(self, col_name: str, value: str, predicate: bool):
         self._complexes[col_name].add(value)
+        self.predicate_value = predicate
 
-    # Check if rule covers negative example
+    # Check if rule covers example
     # Empty set of allowed values means all are possible
     def cover(self, example):
         for col_idx, val in example.items():
@@ -28,10 +30,6 @@ class Rule:
             if val not in allowed_neg_values:
                 return False
         return True
-
-    def update(self, example):
-        if self.cover(example):
-            self.covered += 1
 
     def contains(self, col_name: str, value):
         if col_name not in self._complexes.keys():
@@ -45,31 +43,21 @@ class Rule:
     def __eq__(self, other):
         return hash(self) == hash(other)
 
-    def __lt__(self, other):
-        # Invert the logic for min-heap to work as max-heap
-        return self.covered > other.covered
-
     def __str__(self):
-        return str(self._complexes)
+        return f'{str(self._complexes)}->{self.predicate_value}'
 
     def __repr__(self):
         return str(self)
 
 
-def generate_partial_stars(diff_columns, all_columns) -> set[Rule]:
+def generate_partial_stars(diff_columns, all_columns, predicate: bool) -> set[Rule]:
     partial_stars = set()
     for col_idx, val in diff_columns.items():
         r = Rule(all_columns)
-        r.add(col_idx, val)
+        r.add(col_idx, val, predicate)
         r.covered = 1
         partial_stars.add(r)
     return partial_stars
-
-
-def update_stars(stars: set[Rule], negative):
-    for star in stars:
-        if star.cover(negative):
-            star.update(negative)
 
 
 class Cover:
@@ -83,11 +71,17 @@ class Cover:
         return all(not rule.contains(x, example[x]) for x in example.index)
 
     def covers(self, example):
-        return all(self.cover_positive(rule, example) for rule in self.rules)
+        return any(rule.cover(example) for rule in self.rules)
+
+    def predict(self, example):
+        for rule in self.rules:
+            if rule.cover(example):
+                return rule.predicate_value
+        return False
 
     def add(self, rules: set[Rule], positives: pd.DataFrame):
         for rule in rules:
-            covered = positives.apply(lambda x: self.cover_positive(rule, x), axis=1).sum()
+            covered = positives.apply(lambda x: rule.cover(x), axis=1).sum()
             if covered > self.covered:
                 self.covered = covered
             rule.covered = covered
@@ -105,10 +99,8 @@ class Cover:
         self.rules = set(heapq.nlargest(self.max_rules, self.rules, key=lambda x: x.covered))
 
 
-def seed_star(self, seed):
-    rules = self._generate_stars(seed, self.neg)
-    for rule in rules:
-        rule.covered = self.pos.apply(lambda x: Cover.cover_positive(rule, x), axis=1).sum()
+def seed_star(clf, seed, neg, predicate):
+    rules = clf._generate_stars(seed, neg, predicate)
     return rules
 
 
@@ -118,6 +110,7 @@ class AQClassifier:
         self.max_it = kwargs['it']
         self.max_cpx = kwargs['max_cpx']
         self.max_rules = kwargs['max_rules']
+        self.parrarel_seeds = kwargs['parrarel_seeds']
         self.cover = Cover(self.max_rules)
 
     def save(self, filename):
@@ -138,35 +131,43 @@ class AQClassifier:
         self.cover = Cover(self.max_rules)
         pos = x_train[y_train]
         neg = x_train[~ y_train]
-        self.pos = pos
-        self.neg = neg
-        work_df = pos
-
+        work_df = x_train
+        covered_count = []
         with concurrent.futures.ProcessPoolExecutor() as executor:
             for _ in tqdm(range(self.max_it)):
-                n = 2 if len(work_df) > 2 else len(work_df)
-                jobs = [executor.submit(seed_star, self, seed) for _, seed in work_df.sample(n=n).iterrows()]
+                jobs = []
+                n = self.parrarel_seeds if len(work_df) > self.parrarel_seeds else len(work_df)
+                for idx, seed in work_df.sample(n=n).iterrows():
+                    if y_train[idx]:
+                        jobs.append(executor.submit(seed_star, self, seed, neg, False))
+                    else:
+                        jobs.append(executor.submit(seed_star, self, seed, pos, True))
                 for job in jobs:
                     rules = job.result()
                     self.cover.add_rules(rules)
                 self.cover.prune_worst()
-                covered = work_df.apply(lambda x: self.cover.covers(x), axis=1)
+                covered = work_df.apply(lambda x: self.cover.covers(x) & self.cover.predict(x) == y_train[x.name], axis=1)
+                covered_count.append(covered.sum())
                 work_df = work_df[~covered]
                 if len(work_df) == 0:
-                    return
+                    return covered_count
+        return covered_count
 
     def predict(self, x_test):
-        return x_test.apply(lambda x: self.cover.covers(x), axis=1)
+        return x_test.apply(lambda x: self.cover.predict(x), axis=1)
 
     def _rand_not_covered(self, rules: set[Rule], df):
         for i in range(10):
             idx = df.sample(n=1).index[0]
             neg_ex = df.loc[idx]
-            if any(rule.cover(neg_ex) for rule in rules):
+            if not all(rule.cover(neg_ex) for rule in rules):
                 return neg_ex
         return df.loc[df.sample(n=1).index[0]]
 
-    def _generate_stars(self, seed, negatives) -> set[Rule]:
+    def _generate_stars(self, seed, negatives, predicate) -> set[Rule]:
+        def examples_covered_rate(star: Rule):
+            return negatives.apply(lambda x: star.cover(x), axis=1).mean()
+
         partial_stars: set[Rule] = set()
         i = 0
         work_df = negatives
@@ -176,8 +177,8 @@ class AQClassifier:
             diff_columns = neg_ex[seed != neg_ex]
 
             if len(partial_stars) == 0:
-                for ps in generate_partial_stars(diff_columns, neg_ex.index):
-                    ps.covered = negatives.apply(lambda x: ps.cover(x), axis=1).sum()
+                for ps in generate_partial_stars(diff_columns, neg_ex.index, predicate):
+                    ps.covered = examples_covered_rate(ps)
                     partial_stars.add(ps)
                 continue
 
@@ -188,12 +189,12 @@ class AQClassifier:
                 for col_idx, val in diff_columns.items():
                     if not ps.contains(col_idx, val):
                         new_ps = deepcopy(ps)
-                        new_ps.add(col_idx, val)
-                        new_ps.covered = negatives.apply(lambda x: new_ps.cover(x), axis=1).sum()
+                        new_ps.add(col_idx, val, predicate)
+                        new_ps.covered = examples_covered_rate(new_ps)
                         candidates.add(new_ps)
             # Add rules from current difference between seed and negative example
-            for ps in generate_partial_stars(diff_columns, neg_ex.index):
-                ps.covered = negatives.apply(lambda x: ps.cover(x), axis=1).sum()
+            for ps in generate_partial_stars(diff_columns, neg_ex.index, predicate):
+                ps.covered = examples_covered_rate(ps)
                 candidates.add(ps)
 
             # Add new rules
@@ -208,24 +209,17 @@ class AQClassifier:
 
 
 if __name__ == '__main__':
-    df = pd.read_csv("../../data/processed/adult.csv").select_dtypes(exclude=["number"]).head(100)
-    df['y'] = df['y'].map(lambda x: x == ' <=50K')
+    df = pd.read_csv("../../data/test/adult-0.csv")
+    df['y'] = df['y'].map(lambda x: x == 0)
     X_train, X_test, y_train, y_test = train_test_split(df.drop(columns='y'), df['y'], test_size=0.2)
     clf = AQClassifier(**{
-        'star_it': 20,
-        'it': 10,
-        'max_cpx': 50,
+        'star_it': 50,
+        'it': 5,
+        'max_cpx': 20,
         'max_rules': 10,
+        'parrarel_seeds': 3
     })
-    clf.fit(X_train, y_train)
+    res = clf.fit(X_train, y_train)
+    print(res)
     y_pred = clf.predict(X_test)
     print(f"Accuracy: {classification_report(y_test, y_pred)}")
-    clf.save("../../models/aq")
-    clf2 = AQClassifier.load("../../models/aq", **{
-        'star_it': 20,
-        'it': 10,
-        'max_cpx': 50,
-        'max_rules': 10,
-    })
-    y_pred2 = clf2.predict(X_test)
-    print(f"Accuracy: {classification_report(y_test, y_pred2)}")
