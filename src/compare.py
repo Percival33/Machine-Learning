@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
         cn2.fit_predict(prev_path, test_path, base_rules=previous_rules)
         print(idx, cn2.get_stats())
-        all_stats.append(f"{idx}\t{cn2.get_stats()}")
+        all_stats.append(f"{idx}    {cn2.get_stats()} {len(cn2.get_rules())}")
         previous_rules = cn2.get_rules()
 
     print("bank")
