@@ -111,7 +111,7 @@ data = {
         0.4992343,
         0.5,
     ],
-    "no_rules": [
+    "number_of_rules": [
         255,
         252,
         442,
@@ -246,10 +246,10 @@ cn2_bank = {
         0.25531915,
         0.29333333,
     ],
-    "no_rules": [42, 42, 22, 36, 59, 63, 73, 64, 47, 71, 51, 41, 36, 79, 58, 55, 60, 38, 70, 54],
+    "number_of_rules": [42, 42, 22, 36, 59, 63, 73, 64, 47, 71, 51, 41, 36, 79, 58, 55, 60, 38, 70, 54],
 }
 
-df = pd.DataFrame(data)
+df = pd.DataFrame(cn2_bank)
 
 # Function to plot and save each metric
 FIGURES_FOLDER = os.path.abspath(
@@ -264,7 +264,7 @@ def plot_and_save(metric_name):
     plt.xlabel("")
     plt.grid(True)
     sns.despine()
-    plt.savefig(f"{FIGURES_FOLDER}/adult-{metric_name}.eps", format="eps")
+    plt.savefig(f"{FIGURES_FOLDER}/bank-{metric_name}.eps", format="eps")
     plt.close()
 
 
@@ -274,3 +274,4 @@ plot_and_save("test_time")
 plot_and_save("accuracy")
 plot_and_save("recall")
 plot_and_save("F1")
+plot_and_save("number_of_rules")
