@@ -263,7 +263,7 @@ experiments = [
         'max_rules': 15,
         'no_diff_it': 5,
         'df_path': "data/processed/adult.csv",
-        'filename': "models/aq_adult_50_50_10_15_10",
+        'filename': "models/aq_adult_70_50_10_15_10",
         "result_path": "models/aq_adult_50_50_10_15_10_res.csv",
         'mapping': " <=50K"
     },
@@ -274,9 +274,9 @@ experiments = [
         'max_rules': 15,
         'no_diff_it': 10,
         'df_path': "data/processed/bank-full.csv",
-        'filename': "models/aq_bank_50_50_10_15_10",
+        'filename': "models/aq_bank_200_50_400_15_10",
         "result_path": "models/aq_bank_50_50_10_15_10_res.json",
-        'mapping': "yes"
+        'mapping': "no"
     },
 ]
   
