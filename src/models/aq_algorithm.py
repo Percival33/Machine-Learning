@@ -44,7 +44,7 @@ class Rule:
         return hash(self) == hash(other)
 
     def __str__(self):
-        return f'{str(self._complexes)}->{self.predicate_value}'
+        return f"{str(self._complexes)}->{self.predicate_value}"
 
     def __repr__(self):
         return str(self)
@@ -106,23 +106,23 @@ def seed_star(clf, seed, neg, predicate):
 
 class AQClassifier:
     def __init__(self, **kwargs):
-        self.max_star_it = kwargs['star_it']
-        self.max_it = kwargs['it']
-        self.max_cpx = kwargs['max_cpx']
-        self.max_rules = kwargs['max_rules']
-        self.parrarel_seeds = kwargs['parrarel_seeds']
+        self.max_star_it = kwargs["star_it"]
+        self.max_it = kwargs["it"]
+        self.max_cpx = kwargs["max_cpx"]
+        self.max_rules = kwargs["max_rules"]
+        self.parrarel_seeds = kwargs["parrarel_seeds"]
         self.cover = Cover(self.max_rules)
 
     def save(self, filename):
-        with open(filename, 'wb') as file:
+        with open(filename, "wb") as file:
             pickle.dump(self.cover.rules, file)
 
     @staticmethod
     def load(filename, **kwargs):
-        with open(filename, 'rb') as file:
+        with open(filename, "rb") as file:
             rules = pickle.load(file)
             clf = AQClassifier(**kwargs)
-            cover = Cover(kwargs['max_rules'])
+            cover = Cover(kwargs["max_rules"])
             cover.rules = rules
             clf.cover = cover
             return clf
@@ -130,7 +130,7 @@ class AQClassifier:
     def fit(self, x_train, y_train):
         self.cover = Cover(self.max_rules)
         pos = x_train[y_train]
-        neg = x_train[~ y_train]
+        neg = x_train[~y_train]
         work_df = x_train
         covered_count = []
         with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -146,7 +146,10 @@ class AQClassifier:
                     rules = job.result()
                     self.cover.add_rules(rules)
                 self.cover.prune_worst()
-                covered = work_df.apply(lambda x: self.cover.covers(x) & self.cover.predict(x) == y_train[x.name], axis=1)
+                covered = work_df.apply(
+                    lambda x: self.cover.covers(x) & self.cover.predict(x) == y_train[x.name],
+                    axis=1,
+                )
                 covered_count.append(covered.sum())
                 work_df = work_df[~covered]
                 if len(work_df) == 0:
@@ -201,24 +204,24 @@ class AQClassifier:
             partial_stars = partial_stars.union(candidates)
 
             if len(partial_stars) > self.max_cpx:
-                partial_stars = set(heapq.nlargest(self.max_cpx, partial_stars, key=lambda x: x.covered))
+                partial_stars = set(
+                    heapq.nlargest(self.max_cpx, partial_stars, key=lambda x: x.covered)
+                )
             covered = work_df.apply(lambda x: any(r.cover(x) for r in partial_stars), axis=1)
             work_df = work_df[~covered]
             i += 1
         return partial_stars
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     df = pd.read_csv("../../data/test/adult-0.csv")
-    df['y'] = df['y'].map(lambda x: x == 0)
-    X_train, X_test, y_train, y_test = train_test_split(df.drop(columns='y'), df['y'], test_size=0.2)
-    clf = AQClassifier(**{
-        'star_it': 50,
-        'it': 5,
-        'max_cpx': 20,
-        'max_rules': 10,
-        'parrarel_seeds': 3
-    })
+    df["y"] = df["y"].map(lambda x: x == 0)
+    X_train, X_test, y_train, y_test = train_test_split(
+        df.drop(columns="y"), df["y"], test_size=0.2
+    )
+    clf = AQClassifier(
+        **{"star_it": 50, "it": 5, "max_cpx": 20, "max_rules": 10, "parrarel_seeds": 3}
+    )
     res = clf.fit(X_train, y_train)
     print(res)
     y_pred = clf.predict(X_test)
