@@ -256,17 +256,17 @@ def main(experiments):
         
 
 experiments = [
-    # {
-    #     'star_it': 70,
-    #     'it': 50,
-    #     'max_cpx': 10,
-    #     'max_rules': 15,
-    #     'no_diff_it': 5,
-    #     'df_path': "data/processed/adult.csv",
-    #     'filename': "models/aq_adult_50_50_10_15_10",
-    #     "result_path": "models/aq_adult_50_50_10_15_10_res.csv",
-    #     'mapping': " <=50K"
-    # },
+    {
+        'star_it': 70,
+        'it': 50,
+        'max_cpx': 10,
+        'max_rules': 15,
+        'no_diff_it': 5,
+        'df_path': "data/processed/adult.csv",
+        'filename': "models/aq_adult_50_50_10_15_10",
+        "result_path": "models/aq_adult_50_50_10_15_10_res.csv",
+        'mapping': " <=50K"
+    },
     {
         'star_it': 200,
         'it': 50,
