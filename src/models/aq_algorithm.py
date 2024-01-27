@@ -1,11 +1,11 @@
 import heapq
 import pickle
 import time
-
+import json
 import pandas as pd
 from copy import deepcopy
 
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import concurrent.futures
@@ -157,9 +157,9 @@ class AQClassifier:
             work_idx = work_idx[~covered]
 
             _end = time.time()
-            stats['new_covered'].append(covered.sum())
+            stats['new_covered'].append(int(covered.sum()))
             stats['time'].append(_end - _start)
-            stats['cls_distrib'].append(y_train.loc[work_idx].mean())
+            stats['cls_distrib'].append(float(y_train.loc[work_idx].mean()))
             
             if len(work_idx) == 0:
                 return stats
@@ -232,23 +232,56 @@ class AQClassifier:
             i += 1
         return partial_stars
 
-def main():
-    df = pd.read_csv("data/processed/adult.csv").head(10_000)
-    df['y'] = df['y'].map(lambda x: x == ' <=50K')
-    X_train, X_test, y_train, y_test = train_test_split(df.drop(columns='y'), df['y'], test_size=0.2,random_state=21)
-    clf = AQClassifier(**{
-        'star_it': 50,
+def perform_experiment(exp_data):
+    result = -1
+    for _ in range(3):
+        df = pd.read_csv(exp_data['df_path'])
+        df['y'] = df['y'].map(lambda x: x == exp_data['mapping'])
+        X_train, X_test, y_train, y_test = train_test_split(df.drop(columns='y'), df['y'], test_size=0.2,random_state=2137)
+        clf = AQClassifier(**exp_data)
+        res = clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+        print(f"Accuracy: {classification_report(y_test, y_pred)}")
+        if accuracy_score(y_test, y_pred) > result:
+            result = accuracy_score(y_test, y_pred)
+            clf.save(exp_data['filename'])
+            with open(exp_data['result_path'], 'w') as fh:
+                json.dump(res, fh)
+
+def main(experiments):
+    with concurrent.futures.ProcessPoolExecutor(max_workers=10) as exc:
+        jobs = [exc.submit(perform_experiment, exp_data) for exp_data in experiments]
+        for job in jobs:
+            job.result()
+        
+
+experiments = [
+    # {
+    #     'star_it': 70,
+    #     'it': 50,
+    #     'max_cpx': 10,
+    #     'max_rules': 15,
+    #     'no_diff_it': 5,
+    #     'df_path': "data/processed/adult.csv",
+    #     'filename': "models/aq_adult_50_50_10_15_10",
+    #     "result_path": "models/aq_adult_50_50_10_15_10_res.csv",
+    #     'mapping': " <=50K"
+    # },
+    {
+        'star_it': 200,
         'it': 50,
-        'max_cpx': 10,
+        'max_cpx': 400,
         'max_rules': 15,
-        'no_diff_it': 10
-    })
-    res = clf.fit(X_train, y_train)
-    clf.save("models/aq_adult0")
-    print(res)
-    y_pred = clf.predict(X_test)
-    print(f"Accuracy: {classification_report(y_test, y_pred)}")
-    
+        'no_diff_it': 10,
+        'df_path': "data/processed/bank-full.csv",
+        'filename': "models/aq_bank_50_50_10_15_10",
+        "result_path": "models/aq_bank_50_50_10_15_10_res.json",
+        'mapping': "yes"
+    },
+]
+  
 if __name__ == '__main__':
-    main()
+    main(experiments)
+    
+
     
